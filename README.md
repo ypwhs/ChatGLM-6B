@@ -10,7 +10,10 @@ ChatGLM-6B 使用了和 ChatGPT 相似的技术，针对中文问答和对话进
 *Read this in [English](README_en.md).*
 
 ## 更新信息
+**[2023/03/23]** 增加API部署（感谢 [@LemonQu-GIT](https://github.com/LemonQu-GIT)）。增加Embedding量化模型[ChatGLM-6B-INT4-QE](https://huggingface.co/THUDM/chatglm-6b-int4-qe)。增加对基于Apple Silicon的Mac上GPU加速的支持。
+
 **[2023/03/19]** 增加流式输出接口 `stream_chat`，已更新到网页版和命令行 Demo。修复输出中的中文标点。增加量化后的模型 [ChatGLM-6B-INT4](https://huggingface.co/THUDM/chatglm-6b-int4)
+
 
 ## 使用方式
 
@@ -74,7 +77,7 @@ python web_demo.py
 
 程序会运行一个 Web Server，并输出地址。在浏览器中打开输出的地址即可使用。最新版 Demo 实现了打字机效果，速度体验大大提升。注意，由于国内 Gradio 的网络访问较为缓慢，启用 `demo.queue().launch(share=True, inbrowser=True)` 时所有网络会经过 Gradio 服务器转发，导致打字机体验大幅下降，现在默认启动方式已经改为 `share=False`，如有需要公网访问的需求，可以重新修改为 `share=True` 启动。
 
-感谢[@AdamBear](https://github.com/AdamBear) 实现了基于 Streamlit 的网页版 Demo，运行方式见[#117](https://github.com/THUDM/ChatGLM-6B/pull/117).
+感谢 [@AdamBear](https://github.com/AdamBear) 实现了基于 Streamlit 的网页版 Demo，运行方式见[#117](https://github.com/THUDM/ChatGLM-6B/pull/117).
 
 #### 命令行 Demo
 
@@ -87,6 +90,27 @@ python cli_demo.py
 ```
 
 程序会在命令行中进行交互式的对话，在命令行中输入指示并回车即可生成回复，输入`clear`可以清空对话历史，输入`stop`终止程序。
+
+### API部署
+首先需要安装额外的依赖`pip install fastapi uvicorn`，然后运行仓库中的[api.py](api.py)：
+```shell
+python api.py
+```
+默认部署在本地的8000端口，通过POST方法进行调用
+```shell
+curl -X POST "http://127.0.0.1:8000" \
+     -H 'Content-Type: application/json' \
+     -d '{"prompt": "你好", "history": []}'
+```
+得到的返回值为
+```shell
+{
+  "response":"你好👋！我是人工智能助手 ChatGLM-6B，很高兴见到你，欢迎问我任何问题。",
+  "history":[["你好","你好👋！我是人工智能助手 ChatGLM-6B，很高兴见到你，欢迎问我任何问题。"]],
+  "status":200,
+  "time":"2023-03-23 21:38:40"
+}
+```
 
 ## 低成本部署
 ### 模型量化
@@ -106,6 +130,13 @@ model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True).ha
 model = AutoModel.from_pretrained("THUDM/chatglm-6b-int4", trust_remote_code=True).half().cuda()
 ```
 
+**[2023/03/24]** 我们进一步提供了对Embedding量化后的模型，模型参数仅占用4.3 GB显存：
+```python
+model = AutoModel.from_pretrained("THUDM/chatglm-6b-int4-qe", trust_remote_code=True).half().cuda()
+```
+
+
+
 ### CPU 部署
 如果你没有 GPU 硬件的话，也可以在 CPU 上进行推理，但是推理速度会更慢。使用方法如下（需要大概 32GB 内存）
 ```python
@@ -118,6 +149,17 @@ model = AutoModel.from_pretrained("THUDM/chatglm-6b-int4",trust_remote_code=True
 ```
 
 如果遇到了报错 `Could not find module 'nvcuda.dll'` 或者 `RuntimeError: Unknown platform: darwin` (MacOS) 的话请参考这个[Issue](https://github.com/THUDM/ChatGLM-6B/issues/6#issuecomment-1470060041).
+
+### Mac 上的 GPU 加速
+对于搭载了Apple Silicon的Mac（以及MacBook），可以使用 MPS 后端来在 GPU 上运行 ChatGLM-6B。首先需要参考 Apple 的 [官方说明](https://developer.apple.com/metal/pytorch) 安装 PyTorch-Nightly。然后将模型仓库 clone 到本地
+```shell
+git clone https://huggingface.co/THUDM/chatglm-6b
+```
+将代码中的模型加载改为从本地加载，并使用 mps 后端
+```python
+model = AutoModel.from_pretrained("your local path", trust_remote_code=True).half().to('mps')
+```
+即可使用在 Mac 上使用 GPU 加速模型推理。
 
 ## ChatGLM-6B 示例
 
